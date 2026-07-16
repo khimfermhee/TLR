@@ -198,6 +198,18 @@ class TikTokAPI:
 
         return f"{self.BASE_URL}{signed_path}"
 
+    def _scrape_room_id_from_page(self, user: str) -> str | None:
+        try:
+            response = self.http_client.get(f"{self.BASE_URL}/@{user}/live")
+            match = re.search(r'roomId":"(\d+)"', response.text)
+            if not match:
+                match = re.search(r'room_id":"(\d+)"', response.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            logger.warning(f"Failed to scrape room_id from page: {e}")
+        return None
+
     def get_room_id_from_user(self, user: str) -> str | None:
         """Given a username, get the room_id."""
         try:
@@ -207,7 +219,14 @@ class TikTokAPI:
                 f"[!] tikrec is unavailable ({e}). "
                 "Falling back to unsigned API — recording continues but may be less reliable."
             )
-            return self._old_get_room_id_from_user(user)
+            try:
+                return self._old_get_room_id_from_user(user)
+            except Exception as e_old:
+                logger.warning(f"Unsigned API also failed ({e_old}). Trying page scraping fallback...")
+                room_id = self._scrape_room_id_from_page(user)
+                if room_id:
+                    return room_id
+                raise UserLiveError(TikTokError.ROOM_ID_ERROR)
 
         response = self.http_client.get(signed_url)
         content = response.text
@@ -216,7 +235,10 @@ class TikTokAPI:
             raise UserLiveError(TikTokError.WAF_BLOCKED)
 
         data = response.json()
-        return (data.get("data") or {}).get("user", {}).get("roomId")
+        room_id = (data.get("data") or {}).get("user", {}).get("roomId")
+        if not room_id:
+            room_id = self._scrape_room_id_from_page(user)
+        return room_id
 
     def get_followers_list(self, sec_uid) -> list:
         """
@@ -416,6 +438,10 @@ class TikTokAPI:
     def download_live_stream(self, live_url: str):
         """Generator that returns the live stream for a given room_id."""
         stream = self._http_client_stream.get(live_url, stream=True)
+        if stream.status_code >= 400:
+            logger.error(f"Stream returned HTTP {stream.status_code}")
+            return
+
         for chunk in stream.iter_content(chunk_size=4096):
             if chunk:
                 yield chunk

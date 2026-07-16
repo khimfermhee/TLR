@@ -106,6 +106,10 @@ sudo docker run \
 
 ```bash
 uv run python src/main.py [options]
+
+# Examples:
+python src/main.py -user <username> -mode automatic -automatic_interval 1
+python src/main.py -user <username>
 ```
 
 ### Options

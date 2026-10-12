@@ -115,6 +115,13 @@ class TikTokRecorder:
                 logger.error(Error.CONNECTION_CLOSED_AUTOMATIC)
                 time.sleep(TimeOut.CONNECTION_CLOSED * TimeOut.ONE_MINUTE)
 
+            except Exception as ex:
+                logger.error(f"Unexpected error: {ex}", exc_info=True)
+                logger.info(
+                    f"Waiting {self.automatic_interval} minutes before recheck\n"
+                )
+                time.sleep(self.automatic_interval * TimeOut.ONE_MINUTE)
+
     def followers_mode(self):
         active_recordings = {}  # follower -> Thread
 
@@ -175,6 +182,13 @@ class TikTokRecorder:
             except (ConnectionError, RequestException, HTTPException):
                 logger.error(Error.CONNECTION_CLOSED_AUTOMATIC)
                 time.sleep(TimeOut.CONNECTION_CLOSED * TimeOut.ONE_MINUTE)
+
+            except Exception as ex:
+                logger.error(f"Unexpected error: {ex}", exc_info=True)
+                logger.info(
+                    f"Waiting {self.automatic_interval} minutes before recheck\n"
+                )
+                time.sleep(self.automatic_interval * TimeOut.ONE_MINUTE)
 
     def _build_output_path(self, user: str) -> str:
         filename = (
